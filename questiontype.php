@@ -98,7 +98,13 @@ class qtype_simpledraw extends question_type {
     public function move_files($questionid, $oldcontextid, $newcontextid) {
         parent::move_files($questionid, $oldcontextid, $newcontextid);
         $fs = get_file_storage();
-        $fs->move_area_files_to_new_context($oldcontextid, $newcontextid, 'qtype_simpledraw', 'qtype_simpledraw_image_file', $questionid);
+        $fs->move_area_files_to_new_context(
+            $oldcontextid,
+            $newcontextid,
+            'qtype_simpledraw',
+            'qtype_simpledraw_image_file',
+            $questionid
+        );
     }
 
     /**
@@ -225,7 +231,12 @@ class qtype_simpledraw extends question_type {
                     // Question updated but background was not touched?. If not, delete the bg.
                     if (!isset($question->pre_existing_question_id) || $question->pre_existing_question_id == 0) {
                         $fs = get_file_storage();
-                        $fs->delete_area_files($question->context->id, 'qtype_simpledraw', 'qtype_simpledraw_image_file', $question->id);
+                        $fs->delete_area_files(
+                            $question->context->id,
+                            'qtype_simpledraw',
+                            'qtype_simpledraw_image_file',
+                            $question->id
+                        );
                     }
                 }
             }

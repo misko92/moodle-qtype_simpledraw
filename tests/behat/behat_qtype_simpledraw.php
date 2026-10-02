@@ -35,7 +35,7 @@ class behat_qtype_simpledraw extends behat_base {
      * Waits until the drawing editor inside the iframe has finished loading.
      */
     protected function wait_for_canvas(): void {
-        $this->spin(function() {
+        $this->spin(function () {
             return $this->evaluate_script("return (function() {
                 try {
                     const w = " . self::FRAME . ";

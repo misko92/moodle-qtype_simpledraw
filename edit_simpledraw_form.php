@@ -273,7 +273,11 @@ class qtype_simpledraw_edit_form extends question_edit_form {
             ['size' => 4, 'maxlength' => 5, 'id' => 'qtype_simpledraw_backgroundheight']
         );
         $canvassizearray[] = & $mform->createElement('static', '', '', 'px  &nbsp;  &nbsp;', 'px &nbsp; &nbsp;');
-        $canvassizearray[] = & $mform->createElement('checkbox', 'preservear', get_string('preserveaspectratio', 'qtype_simpledraw'));
+        $canvassizearray[] = & $mform->createElement(
+            'checkbox',
+            'preservear',
+            get_string('preserveaspectratio', 'qtype_simpledraw')
+        );
 
         $mform->addGroup($canvassizearray, 'buttonarx', get_string('canvassize', 'qtype_simpledraw'), [' '], false);
         $mform->closeHeaderBefore('drawsetting');
