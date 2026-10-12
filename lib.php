@@ -64,8 +64,19 @@ function qtype_simpledraw_pluginfile($course, $cm, $context, $filearea, $args, $
 
     $itemid = array_shift($args); // The first item in the $args array.
 
-    // Use the itemid to retrieve any relevant data records and perform any security checks to see if the
-    // user really does have access to the file in question.
+    // The item id is the question id: only people who may view that question get its background.
+    // (Quiz pages embed the background themselves, so students never need this.)
+    if ($filearea !== 'qtype_simpledraw_image_file') {
+        return false;
+    }
+    require_login($course, false, null, false, true);
+    try {
+        if (!question_has_capability_on((int) $itemid, 'view')) {
+            return false;
+        }
+    } catch (\moodle_exception $e) {
+        return false;
+    }
 
     // Extract the filename / filepath from the $args array.
     $filename = array_pop($args); // The last item in the $args array.

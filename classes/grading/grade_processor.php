@@ -17,6 +17,7 @@
 namespace qtype_simpledraw\grading;
 
 use mod_quiz\quiz_attempt;
+use qtype_simpledraw\local\svg_cleaner;
 use mod_quiz\quiz_settings;
 /**
  * Handles grade submission for drawing questions using question_engine.
@@ -86,8 +87,8 @@ class grade_processor {
     public static function save_annotation(int $qubaid, int $slot, int $quizattemptid, string $annotation): bool {
         global $DB, $USER;
 
-        // Clean the annotation - remove any script tags.
-        $annotation = preg_replace('#<script(.*?)>(.*?)</script>#is', '', $annotation);
+        // Keep only plain drawing markup (no scripts, event handlers or outside links).
+        $annotation = svg_cleaner::clean($annotation);
         if (trim($annotation) === '') {
             return false;
         }
@@ -144,6 +145,34 @@ class grade_processor {
     }
 
     /**
+     * Whether the current user may annotate a student's answers to a question.
+     *
+     * True when the student has a quiz attempt using the question in a quiz
+     * the current user can grade.
+     *
+     * @param int $questionid
+     * @param int $studentid
+     * @return bool
+     */
+    public static function can_annotate(int $questionid, int $studentid): bool {
+        global $DB;
+        $quizids = $DB->get_fieldset_sql(
+            "SELECT DISTINCT a.quiz
+               FROM {quiz_attempts} a
+               JOIN {question_attempts} qa ON qa.questionusageid = a.uniqueid
+              WHERE qa.questionid = :questionid AND a.userid = :userid",
+            ['questionid' => $questionid, 'userid' => $studentid]
+        );
+        foreach ($quizids as $quizid) {
+            $cm = get_coursemodule_from_instance('quiz', $quizid, 0, false, IGNORE_MISSING);
+            if ($cm && has_capability('mod/quiz:grade', \context_module::instance($cm->id))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Save annotation directly with explicit parameters.
      * This is used by the AJAX endpoint (saveannotation.php).
      *
@@ -163,8 +192,8 @@ class grade_processor {
     ): bool {
         global $DB, $USER;
 
-        // Clean the annotation - remove any script tags.
-        $annotation = preg_replace('#<script(.*?)>(.*?)</script>#is', '', $annotation);
+        // Keep only plain drawing markup (no scripts, event handlers or outside links).
+        $annotation = svg_cleaner::clean($annotation);
         if (trim($annotation) === '') {
             return false;
         }

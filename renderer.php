@@ -62,6 +62,64 @@ class qtype_simpledraw_renderer extends qtype_renderer {
     }
 
     /**
+     * Remove the XML declaration and doctype from an SVG document, so it can be nested in another.
+     *
+     * @param string $svg
+     * @return string
+     */
+    private static function strip_svg_prolog(string $svg): string {
+        $svg = preg_replace('/<\?xml.*?\?>/s', '', $svg);
+        $svg = preg_replace('/<!DOCTYPE[^>]*>/i', '', $svg);
+        return trim($svg);
+    }
+
+    /**
+     * The question's background as an SVG layer.
+     *
+     * @param array|null $background from get_image_for_question(): [type, content, filename]
+     * @param int $width
+     * @param int $height
+     * @return string
+     */
+    private static function background_layer(?array $background, int $width, int $height): string {
+        if (empty($background[1])) {
+            return '';
+        }
+        if ($background[0] == 'svg') {
+            return self::strip_svg_prolog($background[1]);
+        }
+        return '<image xlink:href="' . s($background[1]) . '" width="' . $width . '" height="' . $height .
+            '" preserveAspectRatio="none"/>';
+    }
+
+    /**
+     * Stack SVG layers into one image.
+     *
+     * The result is an <img> with an SVG data URI. Browsers never run scripts
+     * or load outside resources for SVG shown as an image, so stored drawings
+     * (which come from the browser and may have been tampered with) are safe
+     * to show this way.
+     *
+     * @param string[] $layers SVG documents or fragments, bottom first
+     * @param int $width
+     * @param int $height
+     * @param string $alt text alternative
+     * @return string HTML
+     */
+    private static function svg_image(array $layers, int $width, int $height, string $alt): string {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"' .
+            ' width="' . $width . '" height="' . $height . '" style="background:#fff">' .
+            implode('', $layers) . '</svg>';
+        return \html_writer::empty_tag('img', [
+            'src' => 'data:image/svg+xml;base64,' . base64_encode($svg),
+            'width' => $width,
+            'height' => $height,
+            'alt' => $alt,
+            'class' => 'qtype_simpledraw_drawing',
+        ]);
+    }
+
+    /**
      * Create a GD image from a binary string (currently a stub).
      *
      * @param string $imgstring The raw image data.
@@ -332,48 +390,20 @@ class qtype_simpledraw_renderer extends qtype_renderer {
             $data['str_showanswer'] = get_string('showanswer', 'qtype_simpledraw');
             $data['str_showannotation'] = get_string('showannotation', 'qtype_simpledraw');
 
-            // 1. Prepare Background Style
-            if ($background[0] == 'svg') {
-                $bgcontent = preg_replace("/<\\?xml.*\\?>/", '', $background[1]);
-                $bgcontent = preg_replace("/<\!DOCTYPE.*\>/", '', $bgcontent);
-                $finalbg = trim($bgcontent);
-                $bgurlcss = 'data:image/svg+xml;utf8,' . rawurlencode($background[1]);
-            } else {
-                $finalbg = $background[1];
-                $bgurlcss = $background[1];
-            }
+            // The drawings are shown as images, never as inline markup: an SVG
+            // in an <img> cannot run scripts, whatever the stored answer or
+            // annotation contains.
+            $width = (int) $canvasinfo->backgroundwidth;
+            $height = (int) $canvasinfo->backgroundheight;
+            $backgroundlayer = self::background_layer($background, $width, $height);
+            $answerlayer = self::strip_svg_prolog($currentanswer);
 
-            $bgstyle = (!$bgurlcss || trim($bgurlcss) == '') ? "background: #fff" : "background-image: url($bgurlcss)";
-
-            // 2. Student Answer View
-            $studentmergedanswer = str_replace(
-                '<svg',
-                "<svg style='$bgstyle; background-repeat: no-repeat; background-size: " .
-                    "{$canvasinfo->backgroundwidth}px {$canvasinfo->backgroundheight}px;' ",
-                $currentanswer
-            );
+            // 1. Student answer view.
+            $studentmergedanswer = $currentanswer === '' ? '' :
+                self::svg_image([$backgroundlayer, $answerlayer], $width, $height, get_string('showanswer', 'qtype_simpledraw'));
             $data['student_answer_svg_content'] = $studentmergedanswer;
 
-            // 3. Annotated View
-            $annotationcontent = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"' .
-                ' id="StudentAnnotatedAnswer" width="' . $canvasinfo->backgroundwidth .
-                '" height="' . $canvasinfo->backgroundheight . '">';
-
-            if ($background[0] == 'svg') {
-                $annotationcontent .= $finalbg;
-                $annotationcontent .= $currentanswer;
-            } else {
-                $annotationcontent .= '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"' .
-                    ' width="' . $canvasinfo->backgroundwidth . '" height="' . $canvasinfo->backgroundheight . '">';
-                if ($finalbg) {
-                    $annotationcontent .= '<image xlink:href="' . $finalbg . '" height="' . $canvasinfo->backgroundheight .
-                        '" width="' . $canvasinfo->backgroundwidth . '" preserveAspectRatio="none"></image>';
-                }
-                $annotationcontent .= '</svg>';
-                $annotationcontent .= $currentanswer;
-            }
-
-            // Fetch annotations.
+            // 2. Annotated view.
             $moodleattempt = optional_param('attempt', null, PARAM_INT);
             if (!$moodleattempt) {
                 $raw = (array)$options->questionreviewlink;
@@ -395,15 +425,17 @@ class qtype_simpledraw_renderer extends qtype_renderer {
                 'attemptcount' => $attemptcount,
             ]);
 
-            $hasannotations = false;
-            if ($annotations) {
-                foreach ($annotations as $ann) {
-                    $annotationcontent .= $ann->annotation;
-                }
-                $hasannotations = true;
+            $layers = [$backgroundlayer, $answerlayer];
+            foreach ($annotations as $ann) {
+                $layers[] = self::strip_svg_prolog($ann->annotation);
             }
-            $annotationcontent .= '</svg>';
-            $data['annotation_svg_content'] = $annotationcontent;
+            $hasannotations = !empty($annotations);
+            $data['annotation_svg_content'] = self::svg_image(
+                $layers,
+                $width,
+                $height,
+                get_string('showannotation', 'qtype_simpledraw')
+            );
 
             // Toggle button logic.
             $data['showannotationtoggle'] = $hasannotations && !empty($studentmergedanswer);

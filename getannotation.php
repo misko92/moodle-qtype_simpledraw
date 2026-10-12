@@ -45,7 +45,7 @@ if (!$question = question_bank::load_question_data($id)) {
     echo json_encode(['result' => 'Question attempt not found']);
     die();
 }
-if (!has_capability('mod/quiz:grade', context::instance_by_id($question->contextid))) {
+if (!\qtype_simpledraw\grading\grade_processor::can_annotate((int) $question->id, $stid)) {
     echo json_encode(['result' => 'No permission']);
     die();
 }

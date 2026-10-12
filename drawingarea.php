@@ -37,11 +37,30 @@ $attemptcount = optional_param('attemptcount', 1, PARAM_INT);
 $qubaid = optional_param('qubaid', 0, PARAM_INT);
 $slot = optional_param('slot', 0, PARAM_INT);
 
+require_login();
+
 $question = question_bank::load_question_data($id);
 
 $cmcontext = context::instance_by_id($question->contextid);
 
-require_login();
+// Only people who may see this question in the question bank, or, for a quiz
+// attempt (usage + slot) containing it, the student and the quiz's graders.
+if (!question_has_capability_on($question, 'view')) {
+    $inattempt = $qubaid && $slot && $DB->record_exists(
+        'question_attempts',
+        ['questionusageid' => $qubaid, 'slot' => $slot, 'questionid' => $question->id]
+    );
+    $quizattempt = $inattempt ? $DB->get_record('quiz_attempts', ['uniqueid' => $qubaid]) : false;
+    $allowed = false;
+    if ($quizattempt) {
+        $quizcm = get_coursemodule_from_instance('quiz', $quizattempt->quiz, 0, false, MUST_EXIST);
+        $allowed = $quizattempt->userid == $USER->id ||
+            has_capability('mod/quiz:grade', context_module::instance($quizcm->id));
+    }
+    if (!$allowed) {
+        throw new required_capability_exception($cmcontext, 'moodle/question:viewall', 'nopermissions', '');
+    }
+}
 
 $PAGE->set_context($cmcontext);
 

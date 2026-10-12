@@ -47,7 +47,7 @@ if (!$question = question_bank::load_question_data($id)) {
     die();
 }
 
-if (!has_capability('mod/quiz:grade', context::instance_by_id($question->contextid))) {
+if (!\qtype_simpledraw\grading\grade_processor::can_annotate((int) $question->id, $stid)) {
     echo json_encode(['result' => 'No permission']);
     die();
 }
@@ -59,8 +59,7 @@ if (!$DB->record_exists('qtype_simpledraw', ['questionid' => $id])) {
 }
 
 // Validate annotation is not empty after cleaning.
-$cleanedannotation = preg_replace('#<script(.*?)>(.*?)</script>#is', '', $annotation);
-if (trim($cleanedannotation) === '') {
+if (trim($annotation) === '') {
     echo json_encode(['result' => 'No annotation submitted']);
     die();
 }

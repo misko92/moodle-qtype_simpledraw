@@ -54,6 +54,10 @@ Feature: Students answer a Simple drawing question with a pen only
     And I should see "Answer saved"
     And I press "Submit all and finish"
     And I click on "Submit" "button" in the "Submit all your answers and finish?" "dialogue"
+    # The student's review shows the drawing as an image, not as markup in the page.
+    And "img.qtype_simpledraw_drawing" "css_element" should exist
+    And ".qtype_simpledraw_drawingwrapper_student svg" "css_element" should not exist
+    And the simple drawing review images should load
     And I log out
     And I am on the "Quiz 1 > student1 > Attempt 1" "mod_quiz > Attempt review" page logged in as "teacher1"
     And the simple drawing review should show a student stroke of colour "#000000" and width "4"

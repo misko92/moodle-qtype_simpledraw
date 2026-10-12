@@ -49,7 +49,7 @@ if (!$question = question_bank::load_question_data($id)) {
     echo json_encode(['result' => 'Question attempt not found']);
     die;
 }
-if (!has_capability('mod/quiz:grade', context::instance_by_id($question->contextid))) {
+if (!\qtype_simpledraw\grading\grade_processor::can_annotate((int) $question->id, $stid)) {
     echo json_encode(['result' => 'No permission']);
     die;
 }
@@ -58,7 +58,7 @@ if (!$fhd = $DB->get_record('qtype_simpledraw', ['questionid' => $id])) {
     die;
 }
 
-$result .= '<ul id="listofannotaions">';
+$result = '<ul id="listofannotaions">';
 $fields = ['questionid' => $question->id, 'attemptid' => $attemptid, 'annotatedfor' => $stid, 'attemptcount' => $attemptcount];
 if ($annotations = $DB->get_records('qtype_simpledraw_annotations', $fields, 'timemodified DESC')) {
     foreach ($annotations as $teacherannotation) {
@@ -67,7 +67,7 @@ if ($annotations = $DB->get_records('qtype_simpledraw_annotations', $fields, 'ti
         $result .= '<li id="annotationelem_' . $user->id . '"
                     class="annotaionelems" data-block="block' . $user->id . '">
                     <a href="#" id="showannotationid_' . $teacherannotation->id . '" style="color:#fff" class="tool_showannotation"
-                    data-type="0" data-annotationid="' . $teacherannotation->id . '">' . fullname($user) . '</a>
+                    data-type="0" data-annotationid="' . $teacherannotation->id . '">' . s(fullname($user)) . '</a>
                     <div id="teacherannotationdate_' . $user->id . '">' .
                     userdate($teacherannotation->timemodified) .
                     ' (' . get_string('ago', 'core_message', format_time(time() + 1 - $teacherannotation->timemodified)) .

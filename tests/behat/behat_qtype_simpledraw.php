@@ -155,4 +155,19 @@ class behat_qtype_simpledraw extends behat_base {
             );
         }
     }
+
+    /**
+     * Checks every drawing image on a student's review page has loaded (an invalid SVG shows as a broken image).
+     *
+     * @Then the simple drawing review images should load
+     */
+    public function the_review_images_should_load(): void {
+        $this->getSession()->wait(5000, "Array.from(document.querySelectorAll('img.qtype_simpledraw_drawing'))" .
+            ".every((img) => img.complete)");
+        $broken = $this->evaluate_script("return Array.from(document.querySelectorAll('img.qtype_simpledraw_drawing'))" .
+            ".filter((img) => !img.naturalWidth).length;");
+        if ($broken) {
+            throw new ExpectationException("$broken drawing image(s) did not load", $this->getSession());
+        }
+    }
 }
